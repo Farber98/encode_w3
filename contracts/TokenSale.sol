@@ -5,6 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface IMyERC20 {
     function mint(address to, uint256 amount) external;
+
+    function burnFrom(address account, uint256 amount) external;
 }
 
 contract TokenSale {
@@ -19,5 +21,10 @@ contract TokenSale {
     function buyTokens() external payable {
         uint amountToBeMinted = msg.value * ratio;
         token.mint(msg.sender, amountToBeMinted);
+    }
+
+    function burnTokens(uint256 amount) external {
+        token.burnFrom(msg.sender, amount);
+        payable(msg.sender).transfer(amount / ratio);
     }
 }

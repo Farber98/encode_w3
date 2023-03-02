@@ -61,7 +61,6 @@ describe("NFT Shop", async () => {
         let tokenBalanceBeforeMint: BigNumber
         let ethBalanceBeforeMint: BigNumber
         const ETHER_TO_SPEND: BigNumber = ethers.utils.parseEther("10")
-        let buyTokensFee: BigNumber
         let mintTxFee: BigNumber
 
 
@@ -87,19 +86,40 @@ describe("NFT Shop", async () => {
             const tokenBalanceAfterMint = await myERC20TokenContract.balanceOf(account1.address)
             expect(tokenBalanceAfterMint).to.be.eq(tokenBalanceBeforeMint.add(ETHER_TO_SPEND.mul(TEST_TOKEN_RATIO)))
         });
-    });
 
-    describe("When a user burns an ERC20 at the Shop contract", async () => {
-        beforeEach(async () => {
-        })
+        describe("When a user burns an ERC20 at the Shop contract", async () => {
+            let tokenBalanceBeforeBurn: BigNumber
+            let ethBalanceBeforeBurn: BigNumber
+            let burnTxFee: BigNumber
+            let approveTxFee: BigNumber
+            let tokensToBurn: BigNumber
 
-        it("gives the correct amount of ETH", async () => {
-            throw new Error("Not implemented");
+            beforeEach(async () => {
+                tokenBalanceBeforeBurn = await myERC20TokenContract.balanceOf(account1.address)
+                ethBalanceBeforeBurn = await account1.getBalance()
+                tokensToBurn = tokenBalanceBeforeBurn.div(2)
+                // To burn tokens we need balance and allowance.
+                const approveTx = await myERC20TokenContract.connect(account1).approve(tokenSaleContract.address, tokensToBurn)
+                const approveTxReceipt = await approveTx.wait()
+                approveTxFee = approveTxReceipt.gasUsed.mul(approveTxReceipt.effectiveGasPrice)
+
+                const burnTx = await tokenSaleContract.connect(account1).burnTokens(tokensToBurn)
+                const burnTxReceipt = await burnTx.wait()
+                burnTxFee = burnTxReceipt.gasUsed.mul(burnTxReceipt.effectiveGasPrice)
+            })
+
+            it("gives the correct amount of ETH", async () => {
+                const ethBalanceAfterBurn = await account1.getBalance()
+                expect(ethBalanceAfterBurn).to.be.equal(ethBalanceBeforeBurn.sub(approveTxFee).sub(burnTxFee).add(tokensToBurn.div(TEST_TOKEN_RATIO)))
+
+            });
+
+            it("burns the correct amount of tokens", async () => {
+                const tokenBalanceAfterBurn = await myERC20TokenContract.balanceOf(account1.address)
+                expect(tokenBalanceAfterBurn).to.be.equal(tokenBalanceBeforeBurn.sub(tokensToBurn))
+            });
         });
 
-        it("burns the correct amount of tokens", async () => {
-            throw new Error("Not implemented");
-        });
     });
 
     describe("When a user buys an NFT from the Shop contract", async () => {
