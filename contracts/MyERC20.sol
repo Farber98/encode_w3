@@ -3,9 +3,10 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 
 // Inherits methods from ERC20 and Access Control
-contract MyERC20 is ERC20, AccessControl {
+contract MyERC20 is ERC20, AccessControl, ERC20Burnable {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     constructor() ERC20("MyERC20", "E20") {

@@ -62,6 +62,7 @@ describe("NFT Shop", async () => {
         let ethBalanceBeforeMint: BigNumber
         const ETHER_TO_SPEND: BigNumber = ethers.utils.parseEther("10")
         let buyTokensFee: BigNumber
+        let mintTxFee: BigNumber
 
 
         beforeEach(async () => {
@@ -71,25 +72,27 @@ describe("NFT Shop", async () => {
 
             // Do the minting.  
             const mintTx = await tokenSaleContract.connect(account1).buyTokens({ value: ETHER_TO_SPEND })
-            await mintTx.wait()
+            const mintTexReceipt = await mintTx.wait()
+            mintTxFee = mintTexReceipt.gasUsed.mul(mintTexReceipt.effectiveGasPrice)
 
         });
 
         it("charges the correct amount of ETH", async () => {
             const ethBalanceAfterMint = await account1.getBalance()
-
-            // lte because of tx fee.
-            expect(ethBalanceAfterMint).to.be.lte(ethBalanceBeforeMint.sub(ETHER_TO_SPEND))
+            // Also subtracting tx fee.
+            expect(ethBalanceAfterMint).to.be.eq(ethBalanceBeforeMint.sub(ETHER_TO_SPEND).sub(mintTxFee))
         });
 
         it("gives the correct amount of tokens", async () => {
             const tokenBalanceAfterMint = await myERC20TokenContract.balanceOf(account1.address)
-
             expect(tokenBalanceAfterMint).to.be.eq(tokenBalanceBeforeMint.add(ETHER_TO_SPEND.mul(TEST_TOKEN_RATIO)))
         });
     });
 
     describe("When a user burns an ERC20 at the Shop contract", async () => {
+        beforeEach(async () => {
+        })
+
         it("gives the correct amount of ETH", async () => {
             throw new Error("Not implemented");
         });
