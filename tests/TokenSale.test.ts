@@ -7,7 +7,10 @@ import { ethers } from "hardhat";
 import { TokenSale, TokenSale__factory } from "../typechain-types";
 import { keccak256, toUtf8Bytes } from 'ethers/lib/utils';
 
-const TEST_TOKEN_RATIO: BigNumber = BigNumber.from(10)
+// Each nft is 4 tokens = 2 eth.
+const TEST_NFT_PRICE: BigNumber = BigNumber.from(4)
+// Each token is 0.5eth
+const TEST_TOKEN_RATIO: number = 2
 const MINTER_ROLE_HASH = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("MINTER_ROLE"))
 
 
@@ -32,7 +35,7 @@ describe("NFT Shop", async () => {
 
         // Standard tokenSale contract.
         const tokenSaleContractFactory = new TokenSale__factory(deployer)
-        tokenSaleContract = await tokenSaleContractFactory.deploy(TEST_TOKEN_RATIO, myERC20TokenContract.address)
+        tokenSaleContract = await tokenSaleContractFactory.deploy(TEST_TOKEN_RATIO, TEST_NFT_PRICE, myERC20TokenContract.address)
         await tokenSaleContract.deployTransaction.wait();
 
         // Give minter role to token sale contract
@@ -120,21 +123,44 @@ describe("NFT Shop", async () => {
             });
         });
 
+
+        describe("When a user buys an NFT from the Shop contract", async () => {
+            let tokenBalanceBeforeBuy: BigNumber
+            let buyTxFee: BigNumber
+            let ethBalanceBeforeBuy: BigNumber
+            let approveTxFee: BigNumber
+            const NFT_PRICE = BigNumber.from(5)
+
+            beforeEach(async () => {
+                tokenBalanceBeforeBuy = await myERC20TokenContract.balanceOf(account1.address)
+                ethBalanceBeforeBuy = await account1.getBalance()
+                // To burn tokens we need balance and allowance.
+                const approveTx = await myERC20TokenContract.connect(account1).approve(tokenSaleContract.address, NFT_PRICE)
+                const approveTxReceipt = await approveTx.wait()
+                approveTxFee = approveTxReceipt.gasUsed.mul(approveTxReceipt.effectiveGasPrice)
+
+                const buyTx = await tokenSaleContract.connect(account1).buyNFT()
+                const buyTxReceipt = await buyTx.wait()
+                buyTxFee = buyTxReceipt.gasUsed.mul(buyTxReceipt.effectiveGasPrice)
+            })
+
+
+            it("charges the correct amount of ERC20 tokens", async () => {
+                const tokenBalanceAfterBuy = await myERC20TokenContract.balanceOf(account1.address)
+                expect(tokenBalanceAfterBuy).to.be.equal(tokenBalanceBeforeBuy.sub(NFT_PRICE))
+            });
+
+            it("gives the correct NFT", async () => {
+                throw new Error("Not implemented");
+            });
+
+            it("updates the owner pool account correctly", async () => {
+                throw new Error("Not implemented");
+            });
+        });
+
     });
 
-    describe("When a user buys an NFT from the Shop contract", async () => {
-        it("charges the correct amount of ERC20 tokens", async () => {
-            throw new Error("Not implemented");
-        });
-
-        it("gives the correct NFT", async () => {
-            throw new Error("Not implemented");
-        });
-
-        it("updates the owner pool account correctly", async () => {
-            throw new Error("Not implemented");
-        });
-    });
 
     describe("When a user burns their NFT at the Shop contract", async () => {
         it("gives the correct amount of ERC20 tokens", async () => {
