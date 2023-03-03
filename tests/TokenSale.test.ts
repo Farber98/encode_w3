@@ -157,6 +157,7 @@ describe("NFT Shop", async () => {
                 const buyTx = await tokenSaleContract.connect(account1).buyNFT(TEST_TOKEN_ID)
                 const buyTxReceipt = await buyTx.wait()
                 buyTxFee = buyTxReceipt.gasUsed.mul(buyTxReceipt.effectiveGasPrice)
+
             })
 
 
@@ -174,27 +175,62 @@ describe("NFT Shop", async () => {
                 const withdrawableAmount = await tokenSaleContract.withdrawableAmount();
                 expect(withdrawableAmount).to.be.equal(TEST_NFT_PRICE.div(2))
             });
-        });
 
-    });
+            describe("When a user burns their NFT at the Shop contract", async () => {
+                let accountTokenBalanceBeforeBurn: BigNumber
+                let accountTokenBalanceAfterBurn: BigNumber
+                let contractTokenBalanceBeforeBurn: BigNumber
+                let contractTokenBalanceAfterBurn: BigNumber
+                beforeEach(async () => {
+                    accountTokenBalanceBeforeBurn = await myERC20TokenContract.balanceOf(account1.address)
+                    contractTokenBalanceBeforeBurn = await myERC20TokenContract.balanceOf(tokenSaleContract.address)
+                    const approveNftTx = await myERC721TokenContract.connect(account1).approve(tokenSaleContract.address, TEST_TOKEN_ID)
+                    await approveNftTx.wait()
+                    const burnNftTx = await tokenSaleContract.connect(account1).burnNFT(TEST_TOKEN_ID)
+                    await burnNftTx.wait()
+                    accountTokenBalanceAfterBurn = await myERC20TokenContract.balanceOf(account1.address)
+                    contractTokenBalanceAfterBurn = await myERC20TokenContract.balanceOf(tokenSaleContract.address)
+                })
+
+                it("gives the correct amount of ERC20 tokens", async () => {
+                    expect(accountTokenBalanceAfterBurn).to.be.equal(accountTokenBalanceBeforeBurn.add(TEST_NFT_PRICE))
+                });
+                it("updates the public pool correctly", async () => {
+                    expect(contractTokenBalanceAfterBurn).to.be.equal(contractTokenBalanceBeforeBurn.sub(TEST_NFT_PRICE))
+                });
+            });
 
 
-    describe("When a user burns their NFT at the Shop contract", async () => {
-        it("gives the correct amount of ERC20 tokens", async () => {
-            throw new Error("Not implemented");
-        });
-        it("updates the public pool correctly", async () => {
-            throw new Error("Not implemented");
-        });
-    });
 
-    describe("When the owner withdraw from the Shop contract", async () => {
-        it("recovers the right amount of ERC20 tokens", async () => {
-            throw new Error("Not implemented");
-        });
+            describe("When the owner withdraw from the Shop contract", async () => {
+                let accountTokenBalanceBeforeWithdraw: BigNumber
+                let accountTokenBalanceAfterWithdraw: BigNumber
+                let contractTokenBalanceBeforeWithdraw: BigNumber
+                let contractTokenBalanceAfterWithdraw: BigNumber
+                let withdrawableBefore: BigNumber
+                let withdrawableAfter: BigNumber
+                const WITHDRAW_AMOUNT = TEST_NFT_PRICE.div(4)
 
-        it("updates the owner pool account correctly", async () => {
-            throw new Error("Not implemented");
+                beforeEach(async () => {
+                    accountTokenBalanceBeforeWithdraw = await myERC20TokenContract.balanceOf(deployer.address)
+                    contractTokenBalanceBeforeWithdraw = await myERC20TokenContract.balanceOf(tokenSaleContract.address)
+                    withdrawableBefore = await tokenSaleContract.withdrawableAmount()
+                    const withdrawTx = await tokenSaleContract.connect(deployer).withdraw(WITHDRAW_AMOUNT)
+                    await withdrawTx.wait()
+                    accountTokenBalanceAfterWithdraw = await myERC20TokenContract.balanceOf(deployer.address)
+                    contractTokenBalanceAfterWithdraw = await myERC20TokenContract.balanceOf(tokenSaleContract.address)
+                    withdrawableAfter = await tokenSaleContract.withdrawableAmount()
+
+                })
+
+                it("recovers the right amount of ERC20 tokens", async () => {
+                    expect(accountTokenBalanceAfterWithdraw).to.be.equal(accountTokenBalanceBeforeWithdraw.add(WITHDRAW_AMOUNT))
+                });
+
+                it("updates the owner pool account correctly", async () => {
+                    expect(withdrawableAfter).to.be.equal(withdrawableBefore.sub(WITHDRAW_AMOUNT))
+                });
+            });
         });
     });
 });
