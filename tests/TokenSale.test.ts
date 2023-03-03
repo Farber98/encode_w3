@@ -1,3 +1,5 @@
+import { MyERC721 } from './../typechain-types/contracts/MyERC721';
+import { MyERC721__factory } from './../typechain-types/factories/contracts/MyERC721__factory';
 import { MyERC20 } from './../typechain-types/contracts/MyERC20';
 import { MyERC20__factory } from './../typechain-types/factories/contracts/MyERC20__factory';
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
@@ -11,12 +13,14 @@ import { keccak256, toUtf8Bytes } from 'ethers/lib/utils';
 const TEST_NFT_PRICE: BigNumber = BigNumber.from(4)
 // Each token is 0.5eth
 const TEST_TOKEN_RATIO: number = 2
+const TEST_TOKEN_ID: BigNumber = BigNumber.from(42)
 const MINTER_ROLE_HASH = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("MINTER_ROLE"))
 
 
 describe("NFT Shop", async () => {
     let tokenSaleContract: TokenSale
     let myERC20TokenContract: MyERC20
+    let myERC721TokenContract: MyERC721
     let deployer: SignerWithAddress
     let account1: SignerWithAddress
     let account2: SignerWithAddress
@@ -32,18 +36,30 @@ describe("NFT Shop", async () => {
         myERC20TokenContract = await myERC20ContractFactory.deploy()
         await myERC20TokenContract.deployTransaction.wait()
 
+        // Deploy nft contract.
+        const myERC721ContractFactory = new MyERC721__factory(deployer)
+        myERC721TokenContract = await myERC721ContractFactory.deploy()
+        await myERC721TokenContract.deployTransaction.wait()
+
 
         // Standard tokenSale contract.
         const tokenSaleContractFactory = new TokenSale__factory(deployer)
-        tokenSaleContract = await tokenSaleContractFactory.deploy(TEST_TOKEN_RATIO, TEST_NFT_PRICE, myERC20TokenContract.address)
+        tokenSaleContract = await tokenSaleContractFactory.deploy(TEST_TOKEN_RATIO, TEST_NFT_PRICE, myERC20TokenContract.address, myERC721TokenContract.address)
         await tokenSaleContract.deployTransaction.wait();
 
-        // Give minter role to token sale contract
-        const giveMinterRoleTx = await myERC20TokenContract.grantRole(
+        // Give minter role of erc20 to token sale contract
+        const giveMinterERC20RoleTx = await myERC20TokenContract.grantRole(
             MINTER_ROLE_HASH,
             tokenSaleContract.address)
 
-        await giveMinterRoleTx.wait()
+        await giveMinterERC20RoleTx.wait()
+
+        // Give minter role of erc721 to token sale contract
+        const giveMinterRoleERC721Tx = await myERC721TokenContract.grantRole(
+            MINTER_ROLE_HASH,
+            tokenSaleContract.address)
+
+        await giveMinterRoleERC721Tx.wait()
     });
 
     describe("When the Shop contract is deployed", async () => {
@@ -129,17 +145,16 @@ describe("NFT Shop", async () => {
             let buyTxFee: BigNumber
             let ethBalanceBeforeBuy: BigNumber
             let approveTxFee: BigNumber
-            const NFT_PRICE = BigNumber.from(5)
 
             beforeEach(async () => {
                 tokenBalanceBeforeBuy = await myERC20TokenContract.balanceOf(account1.address)
                 ethBalanceBeforeBuy = await account1.getBalance()
                 // To burn tokens we need balance and allowance.
-                const approveTx = await myERC20TokenContract.connect(account1).approve(tokenSaleContract.address, NFT_PRICE)
+                const approveTx = await myERC20TokenContract.connect(account1).approve(tokenSaleContract.address, TEST_NFT_PRICE)
                 const approveTxReceipt = await approveTx.wait()
                 approveTxFee = approveTxReceipt.gasUsed.mul(approveTxReceipt.effectiveGasPrice)
 
-                const buyTx = await tokenSaleContract.connect(account1).buyNFT()
+                const buyTx = await tokenSaleContract.connect(account1).buyNFT(TEST_TOKEN_ID)
                 const buyTxReceipt = await buyTx.wait()
                 buyTxFee = buyTxReceipt.gasUsed.mul(buyTxReceipt.effectiveGasPrice)
             })
@@ -147,15 +162,17 @@ describe("NFT Shop", async () => {
 
             it("charges the correct amount of ERC20 tokens", async () => {
                 const tokenBalanceAfterBuy = await myERC20TokenContract.balanceOf(account1.address)
-                expect(tokenBalanceAfterBuy).to.be.equal(tokenBalanceBeforeBuy.sub(NFT_PRICE))
+                expect(tokenBalanceAfterBuy).to.be.equal(tokenBalanceBeforeBuy.sub(TEST_NFT_PRICE))
             });
 
             it("gives the correct NFT", async () => {
-                throw new Error("Not implemented");
+                expect(await myERC721TokenContract.balanceOf(account1.address)).to.be.equal(BigNumber.from(1))
+                expect(account1.address).to.be.equal(await myERC721TokenContract.ownerOf(TEST_TOKEN_ID))
             });
 
             it("updates the owner pool account correctly", async () => {
-                throw new Error("Not implemented");
+                const withdrawableAmount = await tokenSaleContract.withdrawableAmount();
+                expect(withdrawableAmount).to.be.equal(TEST_NFT_PRICE.div(2))
             });
         });
 
